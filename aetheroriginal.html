@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-50">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AetherHealth - Professional Care Management</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['"Plus Jakarta Sans"', 'sans-serif'] },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff', 100: '#e0effe',
+                            500: '#0ea5e9',   /* IMPROVED: now lighter than 600 */
+                            600: '#0284c7', 700: '#0369a1', 800: '#075985', 900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- IMPROVED: repeated classes are saved once here and reused (less copy-paste) -->
+    <style type="text/tailwindcss">
+        @layer components {
+            .field { @apply w-full px-3 py-2.5 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-900 focus:bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 focus:border-brand-500 transition; }
+            .label { @apply block text-xs font-semibold text-slate-700 mb-1.5; }
+            .tab { @apply px-4 py-2 rounded-lg text-sm font-semibold transition-all duration-150 flex items-center space-x-2; }
+            .tab-on { @apply bg-brand-50 text-brand-700; }
+            .tab-off { @apply text-slate-600 hover:text-slate-900 hover:bg-slate-100; }
+            .stat-card { @apply bg-white p-5 rounded-xl border border-slate-200 shadow-sm flex items-center space-x-4; }
+            .stat-icon { @apply w-12 h-12 rounded-lg flex items-center justify-center text-xl; }
+            .stat-label { @apply text-xs font-semibold text-slate-500 uppercase tracking-wider; }
+            .meta { @apply text-[10px] uppercase font-bold text-slate-400; }
+            .role-btn { @apply py-2 rounded-lg text-sm font-semibold transition flex items-center justify-center gap-2; }
+            .role-on { @apply bg-white text-brand-700 shadow-sm; }
+            .role-off { @apply text-slate-500 hover:text-slate-800; }
+        }
+    </style>
+</head>
+<body class="h-full font-sans text-slate-800 antialiased flex flex-col">
+
+    <!-- ================= LOGIN SCREEN (shown first) ================= -->
+    <div id="authView" class="flex-1 flex items-center justify-center p-4">
+        <div class="w-full max-w-md space-y-6">
+            <div class="flex items-center justify-center space-x-3">
+                <div class="w-11 h-11 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+                    <i class="fa-solid fa-heart-pulse text-lg"></i>
+                </div>
+                <span class="text-2xl font-bold text-slate-900 tracking-tight">Aether<span class="text-brand-600">Health</span></span>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 p-6 md:p-8 space-y-5">
+                <!-- Patient / Staff switch -->
+                <div class="grid grid-cols-2 gap-1 p-1 bg-slate-100 rounded-xl">
+                    <button type="button" id="roleBtn-patient" onclick="setAuthRole('patient')" class="role-btn role-on"><i class="fa-regular fa-user text-xs"></i>Patient</button>
+                    <button type="button" id="roleBtn-staff" onclick="setAuthRole('staff')" class="role-btn role-off"><i class="fa-solid fa-user-doctor text-xs"></i>Staff</button>
+                </div>
+
+                <div>
+                    <h1 id="authTitle" class="text-xl font-bold text-slate-900">Patient sign in</h1>
+                    <p id="authSubtitle" class="text-sm text-slate-500 mt-1">Sign in to book and manage your appointments.</p>
+                </div>
+
+                <form id="authForm" onsubmit="handleAuth(event)" class="space-y-4">
+                    <div id="nameWrap" class="hidden">
+                        <label for="authName" class="label">Full Name</label>
+                        <input type="text" id="authName" class="field" placeholder="e.g. Eleanor Vance" autocomplete="name">
+                    </div>
+                    <div>
+                        <label for="authEmail" class="label">Email Address</label>
+                        <input type="email" id="authEmail" required class="field" placeholder="you@example.com" autocomplete="email">
+                    </div>
+                    <div>
+                        <label for="authPassword" class="label">Password</label>
+                        <input type="password" id="authPassword" required class="field" placeholder="At least 6 characters" autocomplete="current-password">
+                    </div>
+
+                    <p id="authError" role="alert" class="hidden text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2"></p>
+
+                    <button type="submit" id="authSubmit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md shadow-brand-500/20 transition flex items-center justify-center space-x-2">
+                        <i class="fa-solid fa-right-to-bracket text-sm"></i>
+                        <span id="authSubmitText">Sign in</span>
+                    </button>
+                </form>
+
+                <p id="authSwitch" class="text-center text-xs text-slate-500">
+                    <span id="authSwitchText">New patient?</span>
+                    <button type="button" id="authSwitchBtn" onclick="toggleAuthMode()" class="font-semibold text-brand-600 hover:text-brand-700">Create an account</button>
+                </p>
+
+                <div id="staffHint" class="hidden bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-800">
+                    <b>Demo staff login</b><br>Email: staff@aether.com<br>Password: Staff@123
+                </div>
+            </div>
+            <p class="text-center text-[11px] text-slate-400">Enterprise Sandbox: demo login only, do not enter real passwords.</p>
+        </div>
+    </div>
+
+    <!-- ================= MAIN APP (hidden until login) ================= -->
+    <div id="appView" class="hidden flex-1 flex-col">
+
+    <!-- Top Navigation Bar -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="w-10 h-10 rounded-xl bg-brand-600 flex items-center justify-center text-white shadow-md shadow-brand-500/20">
+                        <i class="fa-solid fa-heart-pulse text-lg"></i>
+                    </div>
+                    <div>
+                        <span class="text-lg font-bold text-slate-900 tracking-tight">Aether<span class="text-brand-600">Health</span></span>
+                        <span class="hidden sm:inline-block ml-2 px-2 py-0.5 text-xs font-medium bg-slate-100 text-slate-600 rounded-md">Enterprise Sandbox</span>
+                    </div>
+                </div>
+
+                <nav class="flex space-x-1 sm:space-x-2">
+                    <button onclick="switchTab('book')" id="nav-book" class="tab tab-on">
+                        <i class="fa-regular fa-calendar-plus text-xs"></i>
+                        <span>Book<span class="hidden sm:inline"> Appointment</span></span>
+                    </button>
+                    <button onclick="switchTab('dashboard')" id="nav-dashboard" class="tab tab-off">
+                        <i class="fa-solid fa-chart-line text-xs"></i>
+                        <span><span id="navDashShort" class="sm:hidden">Portal</span><span id="navDashLong" class="hidden sm:inline">Management Portal</span></span>
+                    </button>
+                </nav>
+
+                <!-- IMPROVED: now visible on phones too (icon only on small screens) -->
+                <div class="flex items-center space-x-2">
+                    <!-- Staff only: JavaScript shows this button for staff -->
+                    <button id="seedBtn" onclick="seedTestData()" aria-label="Load sample data" class="hidden px-3 py-1.5 text-xs font-medium text-slate-600 hover:text-slate-900 bg-slate-100 hover:bg-slate-200 rounded-md border border-slate-200 transition">
+                        <i class="fa-solid fa-database sm:mr-1.5 text-slate-400"></i><span class="hidden sm:inline">Load Sample Data</span>
+                    </button>
+                    <div class="hidden sm:block text-right leading-tight pl-1">
+                        <p id="userName" class="text-xs font-bold text-slate-900 max-w-[9rem] truncate"></p>
+                        <p id="userRole" class="text-[10px] font-semibold uppercase tracking-wider text-brand-600"></p>
+                    </div>
+                    <button onclick="logout()" aria-label="Log out" title="Log out" class="px-3 py-1.5 text-xs font-medium text-rose-600 hover:bg-rose-50 rounded-md border border-slate-200 transition">
+                        <i class="fa-solid fa-right-from-bracket sm:mr-1.5"></i><span class="hidden sm:inline">Log out</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
+        <!-- ================= TAB 1: BOOKING FORM ================= -->
+        <section id="tab-book" class="max-w-3xl mx-auto space-y-6">
+            <div class="text-center md:text-left">
+                <h1 class="text-2xl font-bold text-slate-900">Schedule a Patient Consultation</h1>
+                <p class="text-sm text-slate-500 mt-1">Select a specialist and reserve an available appointment window.</p>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                <form id="bookingForm" onsubmit="handleBooking(event)" class="p-6 md:p-8 space-y-6">
+
+                    <div class="space-y-4">
+                        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Patient Details</h2>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="patientName" class="label">Full Name</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-regular fa-user text-sm"></i></span>
+                                    <input type="text" id="patientName" required class="field pl-9" placeholder="e.g. Eleanor Vance">
+                                </div>
+                            </div>
+                            <div>
+                                <label for="patientEmail" class="label">Email Address</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-slate-400"><i class="fa-regular fa-envelope text-sm"></i></span>
+                                    <input type="email" id="patientEmail" required class="field pl-9" placeholder="eleanor@example.com">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <hr class="border-slate-100">
+
+                    <div class="space-y-4">
+                        <h2 class="text-xs font-bold text-slate-400 uppercase tracking-wider">Appointment Selection</h2>
+                        <div>
+                            <label for="doctorName" class="label">Specialist &amp; Department</label>
+                            <select id="doctorName" required class="field">
+                                <option value="" disabled selected>Select a physician...</option>
+                                <option value="Dr. Sarah Jenkins - Cardiology">Dr. Sarah Jenkins (Cardiology)</option>
+                                <option value="Dr. Marcus Thorne - Neurology">Dr. Marcus Thorne (Neurology)</option>
+                                <option value="Dr. Elena Rostova - Pediatrics">Dr. Elena Rostova (Pediatrics)</option>
+                                <option value="Dr. David Chen - Orthopedics">Dr. David Chen (Orthopedics)</option>
+                            </select>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label for="appointmentDate" class="label">Date</label>
+                                <input type="date" id="appointmentDate" required class="field">
+                            </div>
+                            <div>
+                                <label for="appointmentTime" class="label">Time Slot</label>
+                                <select id="appointmentTime" required class="field">
+                                    <option value="" disabled selected>Choose time...</option>
+                                    <option value="09:00 AM">09:00 AM</option>
+                                    <option value="10:30 AM">10:30 AM</option>
+                                    <option value="01:00 PM">01:00 PM</option>
+                                    <option value="02:30 PM">02:30 PM</option>
+                                    <option value="04:00 PM">04:00 PM</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="bookingNotes" class="label">Notes / Medical Reason (Optional)</label>
+                            <textarea id="bookingNotes" rows="3" class="field" placeholder="Brief description of consultation reason..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="pt-2">
+                        <button type="submit" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-3 px-4 rounded-xl shadow-md shadow-brand-500/20 transition flex items-center justify-center space-x-2">
+                            <i class="fa-solid fa-check text-sm"></i>
+                            <span>Confirm &amp; Schedule Appointment</span>
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- ================= TAB 2: MANAGEMENT DASHBOARD ================= -->
+        <section id="tab-dashboard" class="hidden space-y-6">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div class="stat-card">
+                    <div class="stat-icon bg-blue-50 text-blue-600"><i class="fa-solid fa-calendar-day"></i></div>
+                    <div><p class="stat-label">Total Bookings</p><h3 id="statTotal" class="text-2xl font-bold text-slate-900">0</h3></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-amber-50 text-amber-600"><i class="fa-solid fa-clock"></i></div>
+                    <div><p class="stat-label">Pending Approval</p><h3 id="statPending" class="text-2xl font-bold text-slate-900">0</h3></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-emerald-50 text-emerald-600"><i class="fa-solid fa-circle-check"></i></div>
+                    <div><p class="stat-label">Confirmed</p><h3 id="statConfirmed" class="text-2xl font-bold text-slate-900">0</h3></div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-icon bg-rose-50 text-rose-600"><i class="fa-solid fa-ban"></i></div>
+                    <div><p class="stat-label">Cancelled</p><h3 id="statCancelled" class="text-2xl font-bold text-slate-900">0</h3></div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                <div class="p-5 border-b border-slate-100 bg-slate-50/50 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                    <div>
+                        <h2 id="ledgerTitle" class="text-lg font-bold text-slate-900">Appointment Ledger</h2>
+                        <p id="ledgerSubtitle" class="text-xs text-slate-500">Monitor status, inspect medical records, and update schedules in real time.</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row gap-3">
+                        <div class="relative">
+                            <i class="fa-solid fa-search absolute left-3 top-3 text-xs text-slate-400"></i>
+                            <input type="text" id="searchInput" oninput="renderAppointments()" aria-label="Search appointments" placeholder="Search patient or doctor..." class="pl-8 pr-3 py-2 border border-slate-200 rounded-lg text-xs bg-white focus:outline-none focus:ring-2 focus:ring-brand-500 w-full">
+                        </div>
+                        <select id="filterStatus" onchange="renderAppointments()" aria-label="Filter by status" class="px-3 py-2 border border-slate-200 rounded-lg text-xs bg-white font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-brand-500">
+                            <option value="ALL">All Statuses</option>
+                            <option value="Pending">Pending Only</option>
+                            <option value="Confirmed">Confirmed Only</option>
+                            <option value="Cancelled">Cancelled Only</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left border-collapse">
+                        <thead>
+                            <tr class="bg-slate-100/70 border-b border-slate-200 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                                <th class="p-4">Reference &amp; Patient</th>
+                                <th class="p-4">Attending Physician</th>
+                                <th class="p-4">Schedule</th>
+                                <th class="p-4">Status</th>
+                                <th class="p-4 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="appointmentTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    </div><!-- end of appView -->
+
+    <!-- Modal: View Details -->
+    <div id="detailsModal" role="dialog" aria-modal="true" aria-label="Appointment details" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+            <div class="flex justify-between items-center pb-3 border-b border-slate-100">
+                <h3 class="font-bold text-slate-900">Appointment Details</h3>
+                <button onclick="closeModal()" aria-label="Close details" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+            <div id="modalContent" class="space-y-3 text-xs text-slate-600"></div>
+            <div class="pt-2">
+                <button onclick="closeModal()" class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2 rounded-lg text-xs transition">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Slot Already Booked -->
+    <div id="slotModal" role="alertdialog" aria-modal="true" aria-labelledby="slotTitle" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
+            <div class="mx-auto w-14 h-14 rounded-full bg-amber-50 text-amber-500 flex items-center justify-center text-2xl">
+                <i class="fa-regular fa-calendar-xmark"></i>
+            </div>
+            <div>
+                <h3 id="slotTitle" class="text-lg font-bold text-slate-900">This slot is already booked</h3>
+                <p class="text-sm text-slate-500 mt-1">Someone else has reserved this time. Please pick another one.</p>
+            </div>
+            <div id="slotInfo" class="bg-slate-50 border border-slate-100 rounded-xl p-3 text-xs text-left space-y-1"></div>
+            <div>
+                <p class="text-xs font-semibold text-slate-700 mb-2">Available times that day</p>
+                <div id="slotAlternatives" class="flex flex-wrap justify-center gap-2"></div>
+            </div>
+            <button onclick="closeSlotModal()" class="w-full bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl text-sm transition">Got it</button>
+        </div>
+    </div>
+
+    <!-- Application Logic -->
+    <script>
+        // ---------- Helpers ----------
+
+        // IMPROVEMENT 1 (security): turns user-typed text into harmless text
+        function escapeHTML(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // IMPROVEMENT 4 (crash-proof): if saved data is broken, start with an empty list
+        let appointments = [];
+        try {
+            appointments = JSON.parse(localStorage.getItem('aether_appointments')) || [];
+        } catch (error) {
+            appointments = [];
+        }
+
+        // IMPROVEMENT 3 (date bug): use LOCAL date, not UTC, for the minimum date
+        const now = new Date();
+        const localDate = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+            .toISOString().split('T')[0];
+        document.getElementById('appointmentDate').min = localDate;
+
+        // ================= LOGIN / ACCOUNTS =================
+        // IMPORTANT: this is a front-end DEMO. Real login needs a server.
+        const DEMO_STAFF = { name: 'Dr. Admin', email: 'staff@aether.com', password: 'Staff@123' };
+        let authRole = 'patient';      // which tab is selected on the login screen
+        let authMode = 'signin';       // 'signin' or 'register'
+        let session = null;            // who is logged in right now (null = nobody)
+        let users = [];
+        try { users = JSON.parse(localStorage.getItem('aether_users')) || []; } catch (e) { users = []; }
+
+        // Passwords are never stored as typed: we store a one-way SHA-256 "fingerprint"
+        async function hashPassword(password) {
+            try {
+                if (window.crypto && crypto.subtle) {
+                    const bytes = new TextEncoder().encode('aether-salt:' + password);
+                    const buf = await crypto.subtle.digest('SHA-256', bytes);
+                    return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('');
+                }
+            } catch (e) { /* fall through */ }
+            return 'plain:' + password;   // fallback for very old browsers
+        }
+
+        function saveUsers() { localStorage.setItem('aether_users', JSON.stringify(users)); }
+        function isStaff() { return !!session && session.role === 'staff'; }
+        function show(el, on) { el.classList.toggle('hidden', !on); el.classList.toggle('flex', on); }
+
+        // Staff see everything; patients only see appointments made with their own email
+        function visibleAppointments() {
+            if (!session) return [];
+            return isStaff() ? appointments : appointments.filter(a => a.email.toLowerCase() === session.email);
+        }
+        function canSee(id) { return visibleAppointments().some(a => a.id === id); }
+
+        async function ensureDemoStaff() {
+            if (!users.some(u => u.role === 'staff' && u.email === DEMO_STAFF.email)) {
+                users.push({ name: DEMO_STAFF.name, email: DEMO_STAFF.email, role: 'staff', hash: await hashPassword(DEMO_STAFF.password) });
+                saveUsers();
+            }
+        }
+
+        // ---------- Login protection: slows down people who keep guessing passwords ----------
+        const MAX_ATTEMPTS = 5;                    // wrong tries allowed per email before a lock
+        const DEVICE_MAX = 10;                     // wrong tries allowed in total on this browser
+        const BASE_LOCK_MS = 30 * 1000;            // first lock = 30 seconds (doubles each time)
+        const MAX_LOCK_MS = 15 * 60 * 1000;        // never lock longer than 15 minutes
+        const FAIL_WINDOW_MS = 15 * 60 * 1000;     // old mistakes are forgotten after 15 minutes
+        let lockouts = {};
+        try { lockouts = JSON.parse(localStorage.getItem('aether_lockouts')) || {}; } catch (e) { lockouts = {}; }
+        let authBusy = false;                      // true while a login is being checked
+        let lockTimer = null;
+
+        function saveLockouts() { localStorage.setItem('aether_lockouts', JSON.stringify(lockouts)); }
+        function emailKey(email) { return 'email:' + authRole + ':' + email; }
+
+        // How many milliseconds are left on a lock (0 = not locked)
+        function lockRemaining(key) {
+            const r = lockouts[key];
+            return r && r.lockedUntil > Date.now() ? r.lockedUntil - Date.now() : 0;
+        }
+        // Locked if EITHER this email OR this whole browser is locked
+        function currentLockWait(email) {
+            return Math.max(lockRemaining(emailKey(email)), lockRemaining('device'));
+        }
+
+        function recordFailure(key, max) {
+            const now = Date.now();
+            const r = lockouts[key] || { fails: 0, level: 0, lockedUntil: 0, last: 0 };
+            if (now - r.last > FAIL_WINDOW_MS && r.lockedUntil < now) { r.fails = 0; r.level = 0; }
+            r.fails++;
+            r.last = now;
+            if (r.fails >= max) {
+                r.level++;                                                  // each repeat lock is longer
+                r.lockedUntil = now + Math.min(BASE_LOCK_MS * Math.pow(2, r.level - 1), MAX_LOCK_MS);
+                r.fails = 0;
+            }
+            lockouts[key] = r;
+            // tidy up so the list can't grow forever
+            const keys = Object.keys(lockouts);
+            if (keys.length > 200) {
+                keys.forEach(k => { if (lockouts[k].lockedUntil < now && now - lockouts[k].last > FAIL_WINDOW_MS) delete lockouts[k]; });
+            }
+            saveLockouts();
+        }
+        function clearFailures(key) { delete lockouts[key]; saveLockouts(); }
+
+        // Shows a live countdown and disables the button until the lock ends
+        function showLockMessage(ms) {
+            const btn = document.getElementById('authSubmit');
+            const end = Date.now() + ms;
+            btn.disabled = true;
+            btn.classList.add('opacity-60', 'cursor-not-allowed');
+            clearInterval(lockTimer);
+            const tick = () => {
+                const left = Math.ceil((end - Date.now()) / 1000);
+                if (left <= 0) { clearLockUI(); return; }
+                const mm = Math.floor(left / 60), ss = String(left % 60).padStart(2, '0');
+                showAuthError('Too many failed attempts. Please try again in ' + mm + ':' + ss + '.');
+            };
+            tick();
+            lockTimer = setInterval(tick, 1000);
+        }
+        function clearLockUI() {
+            clearInterval(lockTimer);
+            const btn = document.getElementById('authSubmit');
+            btn.disabled = false;
+            btn.classList.remove('opacity-60', 'cursor-not-allowed');
+            document.getElementById('authError').classList.add('hidden');
+        }
+        // Called when the email/role changes, and on page load (locks survive a refresh)
+        function refreshLockState() {
+            const email = document.getElementById('authEmail').value.trim().toLowerCase();
+            const wait = currentLockWait(email);
+            if (wait > 0) showLockMessage(wait); else clearLockUI();
+        }
+
+        function setAuthRole(role) { authRole = role; authMode = 'signin'; updateAuthUI(); }
+        function toggleAuthMode() { authMode = authMode === 'signin' ? 'register' : 'signin'; updateAuthUI(); }
+
+        function updateAuthUI() {
+            const staff = authRole === 'staff';
+            const register = authMode === 'register' && !staff;
+            const $ = id => document.getElementById(id);
+
+            $('roleBtn-patient').className = 'role-btn ' + (staff ? 'role-off' : 'role-on');
+            $('roleBtn-staff').className = 'role-btn ' + (staff ? 'role-on' : 'role-off');
+            $('nameWrap').classList.toggle('hidden', !register);
+            $('authName').required = register;
+            $('authPassword').autocomplete = register ? 'new-password' : 'current-password';
+            $('authTitle').textContent = staff ? 'Staff sign in' : (register ? 'Create patient account' : 'Patient sign in');
+            $('authSubtitle').textContent = staff ? 'Authorised staff only. Manage all appointments.'
+                : (register ? 'Create an account to book appointments.' : 'Sign in to book and manage your appointments.');
+            $('authSubmitText').textContent = register ? 'Create account' : 'Sign in';
+            $('authSwitch').classList.toggle('hidden', staff);
+            $('authSwitchText').textContent = register ? 'Already registered?' : 'New patient?';
+            $('authSwitchBtn').textContent = register ? 'Sign in' : 'Create an account';
+            $('staffHint').classList.toggle('hidden', !staff);
+            $('authError').classList.add('hidden');
+            refreshLockState();
+        }
+
+        function showAuthError(message) {
+            const box = document.getElementById('authError');
+            box.textContent = message;
+            box.classList.remove('hidden');
+        }
+
+        async function handleAuth(e) {
+            e.preventDefault();
+            if (authBusy) return;                 // ignore rapid repeated clicks
+            authBusy = true;
+            try { await doAuth(); } finally { authBusy = false; }
+        }
+
+        async function doAuth() {
+            const email = document.getElementById('authEmail').value.trim().toLowerCase();
+            const password = document.getElementById('authPassword').value;
+            const name = document.getElementById('authName').value.trim();
+            const hash = await hashPassword(password);
+
+            // Creating a new patient account
+            if (authRole === 'patient' && authMode === 'register') {
+                if (!name) return showAuthError('Please enter your full name.');
+                if (password.length < 6) return showAuthError('Password must be at least 6 characters.');
+                if (users.some(u => u.email === email)) return showAuthError('An account with this email already exists. Please sign in.');
+                const user = { name, email, role: 'patient', hash };
+                users.push(user);
+                saveUsers();
+                return startSession(user);
+            }
+
+            // Signing in (same vague message for wrong email OR wrong password, on purpose)
+            const eKey = emailKey(email);
+            const wait = currentLockWait(email);
+            if (wait > 0) return showLockMessage(wait);          // still locked: don't even check
+
+            const user = users.find(u => u.email === email && u.role === authRole && u.hash === hash);
+            if (!user) {
+                recordFailure(eKey, MAX_ATTEMPTS);
+                recordFailure('device', DEVICE_MAX);
+                const nowWait = currentLockWait(email);
+                if (nowWait > 0) return showLockMessage(nowWait);
+                const left = MAX_ATTEMPTS - (lockouts[eKey] ? lockouts[eKey].fails : 0);
+                return showAuthError('Incorrect email or password. ' + left + ' attempt' + (left === 1 ? '' : 's') + ' left.');
+            }
+            clearFailures(eKey);                                  // correct login: forget old mistakes
+            startSession(user);
+        }
+
+        function startSession(user) {
+            session = { name: user.name, email: user.email, role: user.role };
+            sessionStorage.setItem('aether_session', JSON.stringify(session)); // cleared when the tab closes
+            document.getElementById('authForm').reset();
+            showApp();
+        }
+
+        function logout() {
+            session = null;
+            sessionStorage.removeItem('aether_session');
+            closeModal();
+            closeSlotModal();
+            document.getElementById('searchInput').value = '';
+            document.getElementById('filterStatus').value = 'ALL';
+            show(document.getElementById('appView'), false);
+            show(document.getElementById('authView'), true);
+            setAuthRole('patient');
+        }
+
+        // Sets up the screen for whoever just logged in
+        function showApp() {
+            const staff = isStaff();
+            const $ = id => document.getElementById(id);
+            show($('authView'), false);
+            show($('appView'), true);
+
+            $('userName').textContent = session.name;          // textContent = safe from XSS
+            $('userRole').textContent = staff ? 'Staff' : 'Patient';
+            $('seedBtn').classList.toggle('hidden', !staff);
+            $('navDashShort').textContent = staff ? 'Portal' : 'My Visits';
+            $('navDashLong').textContent = staff ? 'Management Portal' : 'My Appointments';
+            $('ledgerTitle').textContent = staff ? 'Appointment Ledger' : 'My Appointments';
+            $('ledgerSubtitle').textContent = staff
+                ? 'Monitor status, inspect medical records, and update schedules in real time.'
+                : 'View your upcoming consultations and cancel one if your plans change.';
+
+            prepareBookingForm();
+            switchTab('book');
+        }
+
+        // Patients book for themselves (name + email are filled in and locked). Staff can type any patient.
+        function prepareBookingForm() {
+            const n = document.getElementById('patientName');
+            const m = document.getElementById('patientEmail');
+            const lock = !isStaff();
+            if (lock) { n.value = session.name; m.value = session.email; }
+            [n, m].forEach(el => {
+                el.readOnly = lock;
+                el.classList.toggle('opacity-70', lock);
+                el.classList.toggle('cursor-not-allowed', lock);
+            });
+        }
+
+        // Patients can cancel only their own appointments
+        function cancelMine(id) {
+            const apt = appointments.find(a => a.id === id);
+            if (!apt || !canSee(id)) return;
+            if (confirm('Cancel this appointment?')) {
+                apt.status = 'Cancelled';
+                saveData();
+                renderAppointments();
+            }
+        }
+
+        // The buttons in the last table column differ by role
+        function actionControls(apt) {
+            if (isStaff()) {
+                return `
+                        <select onchange="updateStatus('${apt.id}', this.value)" aria-label="Update status" class="text-xs border border-slate-200 rounded-lg px-2 py-1.5 bg-white font-medium text-slate-700 focus:outline-none">
+                            <option value="" disabled selected>Update Status</option>
+                            <option value="Pending">Pending</option>
+                            <option value="Confirmed">Confirm</option>
+                            <option value="Cancelled">Cancel</option>
+                        </select>
+                        <button onclick="deleteRecord('${apt.id}')" aria-label="Delete record" title="Delete" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition">
+                            <i class="fa-regular fa-trash-can"></i>
+                        </button>`;
+            }
+            if (apt.status === 'Cancelled') return '';
+            return `<button onclick="cancelMine('${apt.id}')" aria-label="Cancel appointment" class="px-2.5 py-1.5 border border-rose-200 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition">Cancel</button>`;
+        }
+
+        // ---------- Tabs ----------
+        function switchTab(tab) {
+            const showBook = tab === 'book';
+            document.getElementById('tab-book').classList.toggle('hidden', !showBook);
+            document.getElementById('tab-dashboard').classList.toggle('hidden', showBook);
+            document.getElementById('nav-book').className = 'tab ' + (showBook ? 'tab-on' : 'tab-off');
+            document.getElementById('nav-dashboard').className = 'tab ' + (showBook ? 'tab-off' : 'tab-on');
+            if (!showBook) renderAppointments();
+        }
+
+        // ---------- Booking ----------
+        function handleBooking(e) {
+            e.preventDefault();
+
+            if (!session) return;
+            const doctor = document.getElementById('doctorName').value;
+            const date = document.getElementById('appointmentDate').value;
+            const time = document.getElementById('appointmentTime').value;
+
+            // IMPROVEMENT 2: block double bookings (cancelled slots are free again)
+            const taken = appointments.some(a =>
+                a.doctor === doctor && a.date === date && a.time === time && a.status !== 'Cancelled'
+            );
+            if (taken) {
+                showSlotTaken(doctor, date, time);
+                return;
+            }
+
+            const newAppointment = {
+                id: 'ATH-' + Math.floor(100000 + Math.random() * 900000),
+                name: isStaff() ? document.getElementById('patientName').value : session.name,
+                email: isStaff() ? document.getElementById('patientEmail').value : session.email,
+                doctor, date, time,
+                notes: document.getElementById('bookingNotes').value || 'No medical notes provided.',
+                status: 'Pending',
+                createdAt: new Date().toLocaleDateString()
+            };
+
+            appointments.unshift(newAppointment);
+            saveData();
+            document.getElementById('bookingForm').reset();
+            prepareBookingForm();
+            switchTab('dashboard');
+        }
+
+        // ---------- Dashboard ----------
+        const BADGES = {
+            Confirmed: ['bg-emerald-50 text-emerald-700 border-emerald-200/60', 'bg-emerald-500'],
+            Cancelled: ['bg-rose-50 text-rose-700 border-rose-200/60', 'bg-rose-500'],
+            Pending:   ['bg-amber-50 text-amber-700 border-amber-200/60', 'bg-amber-500']
+        };
+
+        function statusBadge(status) {
+            const [box, dot] = BADGES[status] || BADGES.Pending;
+            return `<span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border ${box}"><span class="w-1.5 h-1.5 rounded-full ${dot} mr-1.5"></span>${status}</span>`;
+        }
+
+        function renderAppointments() {
+            const tbody = document.getElementById('appointmentTableBody');
+            const filter = document.getElementById('filterStatus').value;
+            const searchQuery = document.getElementById('searchInput').value.toLowerCase();
+            tbody.innerHTML = '';
+
+            const mine = visibleAppointments();
+            const count = s => mine.filter(a => a.status === s).length;
+            document.getElementById('statTotal').innerText = mine.length;
+            document.getElementById('statPending').innerText = count('Pending');
+            document.getElementById('statConfirmed').innerText = count('Confirmed');
+            document.getElementById('statCancelled').innerText = count('Cancelled');
+
+            const filtered = mine.filter(apt =>
+                (filter === 'ALL' || apt.status === filter) &&
+                (apt.name.toLowerCase().includes(searchQuery) || apt.doctor.toLowerCase().includes(searchQuery))
+            );
+
+            if (filtered.length === 0) {
+                tbody.innerHTML = `
+                    <tr><td colspan="5" class="p-8 text-center text-slate-400 text-xs">
+                        <i class="fa-regular fa-folder-open text-2xl mb-2 block"></i>
+                        No matching appointment records found.
+                    </td></tr>`;
+                return;
+            }
+
+            filtered.forEach(apt => {
+                const tr = document.createElement('tr');
+                tr.className = 'hover:bg-slate-50/80 transition-colors';
+                // escapeHTML() wraps every value a user could have typed
+                tr.innerHTML = `
+                    <td class="p-4">
+                        <div class="text-xs font-mono font-bold text-slate-400">${escapeHTML(apt.id)}</div>
+                        <div class="font-bold text-slate-900">${escapeHTML(apt.name)}</div>
+                        <div class="text-xs text-slate-500">${escapeHTML(apt.email)}</div>
+                    </td>
+                    <td class="p-4 font-medium text-slate-700">${escapeHTML(apt.doctor)}</td>
+                    <td class="p-4">
+                        <div class="font-medium text-slate-900">${escapeHTML(apt.date)}</div>
+                        <div class="text-xs text-slate-500">${escapeHTML(apt.time)}</div>
+                    </td>
+                    <td class="p-4">${statusBadge(apt.status)}</td>
+                    <td class="p-4 text-right space-x-1 whitespace-nowrap">
+                        <button onclick="openModal('${apt.id}')" aria-label="View details" title="View Details" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition">
+                            <i class="fa-regular fa-eye"></i>
+                        </button>
+                        ${actionControls(apt)}
+                    </td>`;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateStatus(id, newStatus) {
+            if (!isStaff()) return;
+            const apt = appointments.find(a => a.id === id);
+            if (apt) { apt.status = newStatus; saveData(); renderAppointments(); }
+        }
+
+        function deleteRecord(id) {
+            if (!isStaff()) return;
+            if (confirm('Are you sure you want to delete this record?')) {
+                appointments = appointments.filter(a => a.id !== id);
+                saveData();
+                renderAppointments();
+            }
+        }
+
+        function saveData() {
+            localStorage.setItem('aether_appointments', JSON.stringify(appointments));
+        }
+
+        // ---------- Modal ----------
+        function openModal(id) {
+            if (!canSee(id)) return;
+            const apt = appointments.find(a => a.id === id);
+            if (!apt) return;
+
+            document.getElementById('modalContent').innerHTML = `
+                <div class="bg-slate-50 p-3 rounded-lg border border-slate-100 space-y-1">
+                    <p class="meta">Reference ID</p>
+                    <p class="font-mono font-bold text-slate-800">${escapeHTML(apt.id)}</p>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><p class="meta">Patient</p><p class="font-semibold text-slate-800">${escapeHTML(apt.name)}</p></div>
+                    <div><p class="meta">Email</p><p class="font-semibold text-slate-800 break-all">${escapeHTML(apt.email)}</p></div>
+                </div>
+                <div>
+                    <p class="meta">Doctor / Department</p>
+                    <p class="font-semibold text-slate-800">${escapeHTML(apt.doctor)}</p>
+                </div>
+                <div class="grid grid-cols-2 gap-2">
+                    <div><p class="meta">Date &amp; Time</p><p class="font-semibold text-slate-800">${escapeHTML(apt.date)} at ${escapeHTML(apt.time)}</p></div>
+                    <div><p class="meta">Current Status</p><p class="font-semibold text-slate-800">${escapeHTML(apt.status)}</p></div>
+                </div>
+                <div>
+                    <p class="meta">Reason / Notes</p>
+                    <p class="text-slate-600 bg-slate-50 p-2.5 rounded border border-slate-100 mt-1">${escapeHTML(apt.notes)}</p>
+                </div>`;
+            const modal = document.getElementById('detailsModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() {
+            const modal = document.getElementById('detailsModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // ---------- "Slot already booked" popup ----------
+        const TIME_SLOTS = ['09:00 AM', '10:30 AM', '01:00 PM', '02:30 PM', '04:00 PM'];
+
+        function showSlotTaken(doctor, date, time) {
+            document.getElementById('slotInfo').innerHTML = `
+                <div><i class="fa-solid fa-user-doctor w-4 text-slate-400"></i> ${escapeHTML(doctor)}</div>
+                <div><i class="fa-regular fa-calendar w-4 text-slate-400"></i> ${escapeHTML(date)} at <b>${escapeHTML(time)}</b></div>`;
+
+            // Which times are still free for this doctor on this date?
+            const free = TIME_SLOTS.filter(t =>
+                !appointments.some(a => a.doctor === doctor && a.date === date && a.time === t && a.status !== 'Cancelled')
+            );
+
+            const box = document.getElementById('slotAlternatives');
+            if (free.length === 0) {
+                box.innerHTML = '<p class="text-xs text-slate-400">No free times left on this date. Please try another day.</p>';
+            } else {
+                box.innerHTML = free.map(t =>
+                    `<button type="button" onclick="pickTime('${t}')" class="px-3 py-1.5 rounded-lg border border-brand-100 bg-brand-50 text-brand-700 text-xs font-semibold hover:bg-brand-100 transition">${t}</button>`
+                ).join('');
+            }
+
+            const modal = document.getElementById('slotModal');
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeSlotModal() {
+            const modal = document.getElementById('slotModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+
+        // Clicking a free time fills the form's time box for the patient
+        function pickTime(t) {
+            document.getElementById('appointmentTime').value = t;
+            closeSlotModal();
+        }
+
+        // Close popups with the Escape key or by clicking the dark background
+        document.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { closeModal(); closeSlotModal(); }
+        });
+        document.getElementById('detailsModal').addEventListener('click', e => {
+            if (e.target.id === 'detailsModal') closeModal();
+        });
+        document.getElementById('slotModal').addEventListener('click', e => {
+            if (e.target.id === 'slotModal') closeSlotModal();
+        });
+
+        // ---------- Sample data ----------
+        function seedTestData() {
+            if (!isStaff()) return;
+            // IMPROVEMENT 4: warn before replacing real bookings
+            if (appointments.length > 0 && !confirm('This will replace your current appointments. Continue?')) return;
+
+            appointments = [
+                { id: 'ATH-802910', name: 'Eleanor Vance', email: 'eleanor@example.com', doctor: 'Dr. Sarah Jenkins - Cardiology', date: '2026-10-24', time: '10:30 AM', notes: 'Routine annual checkup and ECG evaluation.', status: 'Confirmed', createdAt: '2026-10-15' },
+                { id: 'ATH-491203', name: 'Marcus Sterling', email: 'marcus@example.com', doctor: 'Dr. Marcus Thorne - Neurology', date: '2026-10-25', time: '01:00 PM', notes: 'Persistent migraine consultation.', status: 'Pending', createdAt: '2026-10-16' },
+                { id: 'ATH-192039', name: 'Sophia Martinez', email: 'sophia@example.com', doctor: 'Dr. Elena Rostova - Pediatrics', date: '2026-10-22', time: '09:00 AM', notes: 'Follow-up consultation.', status: 'Cancelled', createdAt: '2026-10-12' }
+            ];
+            saveData();
+            renderAppointments();
+        }
+
+        // ---------- Start-up: runs once when the page opens ----------
+        (async function initAuth() {
+            await ensureDemoStaff();
+            document.getElementById('authEmail').addEventListener('input', refreshLockState);
+            updateAuthUI();
+            try {
+                const saved = JSON.parse(sessionStorage.getItem('aether_session'));
+                if (saved && users.some(u => u.email === saved.email && u.role === saved.role)) {
+                    session = saved;
+                    showApp();
+                }
+            } catch (e) { /* no valid session: stay on the login screen */ }
+        })();
+    </script>
+</body>
+</html>
