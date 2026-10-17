@@ -312,6 +312,46 @@
         </div>
     </div>
 
+    <!-- Modal: Edit Appointment (patients) -->
+    <div id="editModal" role="dialog" aria-modal="true" aria-labelledby="editTitle" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
+        <form id="editForm" onsubmit="saveEdit(event)" class="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-100 space-y-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-start pb-3 border-b border-slate-100">
+                <div>
+                    <h3 id="editTitle" class="font-bold text-slate-900">Update Appointment</h3>
+                    <p id="editRef" class="text-xs font-mono text-slate-400 mt-0.5"></p>
+                </div>
+                <button type="button" onclick="closeEdit()" aria-label="Close" class="text-slate-400 hover:text-slate-600 text-lg"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <div>
+                <label for="editDoctor" class="label">Specialist &amp; Department</label>
+                <select id="editDoctor" required class="field"></select>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="editDate" class="label">Date</label>
+                    <input type="date" id="editDate" required class="field">
+                </div>
+                <div>
+                    <label for="editTime" class="label">Time Slot</label>
+                    <select id="editTime" required class="field"></select>
+                </div>
+            </div>
+            <div>
+                <label for="editNotes" class="label">Notes / Medical Reason</label>
+                <textarea id="editNotes" rows="3" class="field" placeholder="Brief description of consultation reason..."></textarea>
+            </div>
+
+            <p id="editError" role="alert" class="hidden text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2"></p>
+            <p class="text-[11px] text-slate-400">If you change the doctor, date or time, the appointment goes back to <b>Pending</b> until staff confirm it again.</p>
+
+            <div class="grid grid-cols-2 gap-3 pt-1">
+                <button type="button" onclick="closeEdit()" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold py-2.5 rounded-xl text-sm transition">Keep as is</button>
+                <button type="submit" class="bg-brand-600 hover:bg-brand-700 text-white font-semibold py-2.5 rounded-xl text-sm transition">Save changes</button>
+            </div>
+        </form>
+    </div>
+
     <!-- Modal: Slot Already Booked -->
     <div id="slotModal" role="alertdialog" aria-modal="true" aria-labelledby="slotTitle" class="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-50 hidden items-center justify-center p-4">
         <div class="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-100 text-center space-y-4">
@@ -581,6 +621,7 @@
             sessionStorage.removeItem('aether_session');
             closeModal();
             closeSlotModal();
+            closeEdit();
             document.getElementById('searchInput').value = '';
             document.getElementById('filterStatus').value = 'ALL';
             show(document.getElementById('appView'), false);
@@ -648,7 +689,8 @@
                         </button>`;
             }
             if (apt.status === 'Cancelled') return '';
-            return `<button onclick="cancelMine('${apt.id}')" aria-label="Cancel appointment" class="px-2.5 py-1.5 border border-rose-200 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition">Cancel</button>`;
+            return `<button onclick="openEdit('${apt.id}')" aria-label="Edit appointment" class="px-2.5 py-1.5 border border-slate-200 rounded-lg text-xs font-medium text-slate-600 hover:bg-slate-100 transition"><i class="fa-regular fa-pen-to-square mr-1"></i>Edit</button>
+                    <button onclick="cancelMine('${apt.id}')" aria-label="Cancel appointment" class="px-2.5 py-1.5 border border-rose-200 rounded-lg text-xs font-medium text-rose-600 hover:bg-rose-50 transition">Cancel</button>`;
         }
 
         // ---------- Tabs ----------
@@ -857,12 +899,85 @@
             closeSlotModal();
         }
 
+        // ---------- Patient: update (reschedule) an appointment ----------
+        let editId = null;   // which appointment is being edited right now
+
+        function openEdit(id) {
+            if (isStaff() || !canSee(id)) return;                     // patients only, and only their own
+            const apt = appointments.find(a => a.id === id);
+            if (!apt || apt.status === 'Cancelled') return;
+
+            // Copy the doctor and time lists from the booking form so they always match
+            const copyOptions = (target, source) =>
+                target.replaceChildren(...Array.from(source.options).filter(o => !o.disabled).map(o => o.cloneNode(true)));
+            copyOptions(document.getElementById('editDoctor'), document.getElementById('doctorName'));
+            copyOptions(document.getElementById('editTime'), document.getElementById('appointmentTime'));
+
+            editId = id;
+            document.getElementById('editRef').textContent = 'Reference ' + apt.id;
+            document.getElementById('editDoctor').value = apt.doctor;
+            document.getElementById('editDate').min = apt.date < localDate ? apt.date : localDate;
+            document.getElementById('editDate').value = apt.date;
+            document.getElementById('editTime').value = apt.time;
+            document.getElementById('editNotes').value = apt.notes === 'No medical notes provided.' ? '' : apt.notes;
+            document.getElementById('editError').classList.add('hidden');
+            show(document.getElementById('editModal'), true);
+        }
+
+        function closeEdit() {
+            editId = null;
+            show(document.getElementById('editModal'), false);
+        }
+
+        function showEditError(message) {
+            const box = document.getElementById('editError');
+            box.textContent = message;
+            box.classList.remove('hidden');
+        }
+
+        function saveEdit(e) {
+            e.preventDefault();
+            const apt = appointments.find(a => a.id === editId);
+            // Double-check the rules here too, not just by hiding buttons
+            if (!apt || isStaff() || !canSee(apt.id) || apt.status === 'Cancelled') return closeEdit();
+
+            const doctor = document.getElementById('editDoctor').value;
+            const date = document.getElementById('editDate').value;
+            const time = document.getElementById('editTime').value;
+            const notes = document.getElementById('editNotes').value.trim() || 'No medical notes provided.';
+            const slotChanged = doctor !== apt.doctor || date !== apt.date || time !== apt.time;
+
+            if (slotChanged) {
+                if (date < localDate) return showEditError('Please choose today or a future date.');
+                // Other people's active bookings for the same doctor + date (ignoring this appointment itself)
+                const clash = a => a.id !== apt.id && a.doctor === doctor && a.date === date && a.status !== 'Cancelled';
+                if (appointments.some(a => clash(a) && a.time === time)) {
+                    const free = TIME_SLOTS.filter(t => !appointments.some(a => clash(a) && a.time === t));
+                    return showEditError('That slot is already booked.' +
+                        (free.length ? ' Free times that day: ' + free.join(', ') + '.' : ' No free times that day, please try another date.'));
+                }
+            }
+
+            apt.doctor = doctor;
+            apt.date = date;
+            apt.time = time;
+            apt.notes = notes;
+            if (slotChanged) apt.status = 'Pending';     // staff must re-confirm a new time
+            apt.updatedAt = new Date().toLocaleDateString();
+            saveData();
+            closeEdit();
+            renderAppointments();
+        }
+
         // Close popups with the Escape key or by clicking the dark background
         document.addEventListener('keydown', e => {
-            if (e.key === 'Escape') { closeModal(); closeSlotModal(); }
+            if (e.key === 'Escape') { closeModal(); closeSlotModal(); closeEdit(); }
         });
         document.getElementById('detailsModal').addEventListener('click', e => {
             if (e.target.id === 'detailsModal') closeModal();
+        });
+        document.getElementById('editModal').addEventListener('click', e => {
+            if (e.target.id === 'editModal') closeEdit();
         });
         document.getElementById('slotModal').addEventListener('click', e => {
             if (e.target.id === 'slotModal') closeSlotModal();
