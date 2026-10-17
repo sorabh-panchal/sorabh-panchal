@@ -76,11 +76,16 @@
                     </div>
                     <div>
                         <label for="authEmail" class="label">Email Address</label>
-                        <input type="email" id="authEmail" required class="field" placeholder="you@example.com" autocomplete="email">
+                        <input type="email" id="authEmail" required class="field" placeholder="you@example.com" autocomplete="email" autocapitalize="off" autocorrect="off" spellcheck="false">
                     </div>
                     <div>
                         <label for="authPassword" class="label">Password</label>
-                        <input type="password" id="authPassword" required class="field" placeholder="At least 6 characters" autocomplete="current-password">
+                        <div class="relative">
+                            <input type="password" id="authPassword" required class="field pr-10" placeholder="At least 6 characters" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">
+                            <button type="button" id="pwToggle" onclick="togglePassword()" aria-label="Show password" title="Show / hide password" class="absolute inset-y-0 right-0 px-3 text-slate-400 hover:text-slate-700">
+                                <i id="pwIcon" class="fa-regular fa-eye"></i>
+                            </button>
+                        </div>
                     </div>
 
                     <p id="authError" role="alert" class="hidden text-xs text-rose-700 bg-rose-50 border border-rose-100 rounded-lg px-3 py-2"></p>
@@ -97,7 +102,7 @@
                 </p>
 
                 <div id="staffHint" class="hidden bg-amber-50 border border-amber-100 rounded-lg p-3 text-xs text-amber-800">
-                    <b>Demo staff login</b><br>Email: staff@aether.com<br>Password: Staff@123
+                    <b>Demo staff login</b><br>Email: staff@aether.com<br>Password: Staff@123<br><button type="button" onclick="fillDemo()" class="mt-2 px-2.5 py-1 rounded-md bg-amber-100 hover:bg-amber-200 font-semibold transition">Fill in for me</button>
                 </div>
             </div>
             <p class="text-center text-[11px] text-slate-400">Enterprise Sandbox: demo login only, do not enter real passwords.</p>
@@ -384,10 +389,12 @@
         function canSee(id) { return visibleAppointments().some(a => a.id === id); }
 
         async function ensureDemoStaff() {
-            if (!users.some(u => u.role === 'staff' && u.email === DEMO_STAFF.email)) {
-                users.push({ name: DEMO_STAFF.name, email: DEMO_STAFF.email, role: 'staff', hash: await hashPassword(DEMO_STAFF.password) });
-                saveUsers();
-            }
+            // Refresh the demo staff account every time, so an old saved copy can never break the demo login
+            const hash = await hashPassword(DEMO_STAFF.password);
+            const existing = users.find(u => u.role === 'staff' && u.email === DEMO_STAFF.email);
+            if (existing) existing.hash = hash;
+            else users.push({ name: DEMO_STAFF.name, email: DEMO_STAFF.email, role: 'staff', hash });
+            saveUsers();
         }
 
         // ---------- Login protection: slows down people who keep guessing passwords ----------
@@ -463,6 +470,29 @@
             const email = document.getElementById('authEmail').value.trim().toLowerCase();
             const wait = currentLockWait(email);
             if (wait > 0) showLockMessage(wait); else clearLockUI();
+        }
+
+        // Show / hide the password while typing
+        function hidePassword() {
+            document.getElementById('authPassword').type = 'password';
+            document.getElementById('pwIcon').className = 'fa-regular fa-eye';
+            document.getElementById('pwToggle').setAttribute('aria-label', 'Show password');
+        }
+        function togglePassword() {
+            const input = document.getElementById('authPassword');
+            if (input.type === 'password') {
+                input.type = 'text';
+                document.getElementById('pwIcon').className = 'fa-regular fa-eye-slash';
+                document.getElementById('pwToggle').setAttribute('aria-label', 'Hide password');
+            } else {
+                hidePassword();
+            }
+        }
+        // Types the demo staff email + password for you (no typos)
+        function fillDemo() {
+            document.getElementById('authEmail').value = DEMO_STAFF.email;
+            document.getElementById('authPassword').value = DEMO_STAFF.password;
+            refreshLockState();
         }
 
         function setAuthRole(role) { authRole = role; authMode = 'signin'; updateAuthUI(); }
@@ -542,6 +572,7 @@
             session = { name: user.name, email: user.email, role: user.role };
             sessionStorage.setItem('aether_session', JSON.stringify(session)); // cleared when the tab closes
             document.getElementById('authForm').reset();
+            hidePassword();
             showApp();
         }
 
